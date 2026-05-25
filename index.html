@@ -1159,17 +1159,36 @@ function refreshTomatoDisplay() {
   }
 }
 
+// --- AudioContext 共有管理（ブラウザ自動再生ブロック対策）---
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx || _audioCtx.state === 'closed') {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return _audioCtx;
+}
+// ユーザー操作があるたびに AudioContext をアンロック
+['click', 'touchstart', 'keydown'].forEach(ev =>
+  document.addEventListener(ev, () => {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+  }, { passive: true })
+);
+
 function playBeep() {
   if (!soundOn.checked) return;
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  [0, 0.2, 0.4].forEach(delay => {
-    const osc = ctx.createOscillator(), gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.frequency.value = 880; osc.type = 'sine';
-    gain.gain.setValueAtTime(0.4, ctx.currentTime + delay);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.3);
-    osc.start(ctx.currentTime + delay); osc.stop(ctx.currentTime + delay + 0.35);
-  });
+  const ctx = getAudioCtx();
+  const doBeep = () => {
+    [0, 0.2, 0.4].forEach(delay => {
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = 880; osc.type = 'sine';
+      gain.gain.setValueAtTime(0.4, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.3);
+      osc.start(ctx.currentTime + delay); osc.stop(ctx.currentTime + delay + 0.35);
+    });
+  };
+  if (ctx.state === 'suspended') ctx.resume().then(doBeep); else doBeep();
 }
 
 let toastTimer;
@@ -1347,9 +1366,10 @@ function triggerAlarm() {
 }
 
 function playMcSound(type) {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const ctx = getAudioCtx();
   const fns = { creeper: mcCreeper, zombie: mcZombie, enderman: mcEnderman, pig: mcPig, skeleton: mcSkeleton };
-  (fns[type] || mcCreeper)(ctx);
+  const play = () => (fns[type] || mcCreeper)(ctx);
+  if (ctx.state === 'suspended') ctx.resume().then(play); else play();
 }
 
 // 💚 クリーパー: ジリジリ上昇 → ドーン
