@@ -617,6 +617,73 @@
       .alarm-section, .settings-row { width: 100%; align-items: center; }
     }
 
+    /* ── サウンド停止ポップアップ ── */
+    .stop-popup {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 400;
+      background: rgba(0, 0, 0, 0.65);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .stop-popup.show {
+      opacity: 1;
+      pointer-events: all;
+    }
+    .stop-popup-box {
+      background: #0d1526;
+      border: 2px solid var(--accent);
+      border-radius: 1.6rem;
+      padding: 2rem 2.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.2rem;
+      text-align: center;
+      transform: scale(0.82);
+      transition: transform 0.35s cubic-bezier(.175,.885,.32,1.275);
+      min-width: 220px;
+      max-width: 90vw;
+    }
+    .stop-popup.show .stop-popup-box {
+      transform: scale(1);
+      animation: stopGlow 1.6s ease-in-out infinite;
+    }
+    @keyframes stopGlow {
+      0%, 100% { box-shadow: 0 0 30px var(--accent-glow), 0 16px 50px #000a; }
+      50%       { box-shadow: 0 0 70px var(--accent-glow), 0 20px 70px #000c; }
+    }
+    .stop-popup-msg {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .stop-popup-sound {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      letter-spacing: 0.05em;
+    }
+    .stop-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 999px;
+      padding: 0.75rem 2.5rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 20px var(--accent-glow);
+      letter-spacing: 0.06em;
+    }
+    .stop-btn:hover  { filter: brightness(1.15); }
+    .stop-btn:active { transform: scale(0.95); }
+
     /* ── ミニボタン ── */
     .mini-btn {
       background: none;
@@ -664,6 +731,15 @@
 
 <canvas id="bgCanvas"></canvas>
 <div class="toast" id="toast"></div>
+
+<!-- サウンド停止ポップアップ -->
+<div class="stop-popup" id="stopPopup">
+  <div class="stop-popup-box">
+    <div class="stop-popup-msg" id="stopPopupMsg">✅ タイマー完了！</div>
+    <div class="stop-popup-sound" id="stopPopupSound"></div>
+    <button class="stop-btn" id="stopSoundBtn">⏹ 停止</button>
+  </div>
+</div>
 
 <div class="header-row">
   <h1>🍅 MIZUKING TIMER</h1>
@@ -988,16 +1064,17 @@ function tick() {
 }
 
 function onComplete() {
-  playBeep();
   if (currentMode === 'work') {
     completed++;
     completedCount.textContent = completed;
     updateTomatoes();
     const isLong = completed % 4 === 0;
-    showToast(isLong ? '🎉 お疲れさまです！長休憩にしましょう' : '✅ 集中完了！休憩しましょう');
+    const msg = isLong ? '🎉 お疲れさまです！\n長休憩にしましょう' : '✅ 集中完了！\n休憩しましょう';
+    if (soundOn.checked) startSoundLoop(msg); else showToast(msg.replace('\n', ''));
     if (autoSwitch.checked) setTimeout(() => { const next = isLong ? 'long' : 'short'; applyMode(next); syncActiveTab(next); }, 1200);
   } else {
-    showToast('⏰ 休憩終了！集中タイムを始めましょう');
+    const msg = '⏰ 休憩終了！\n集中タイムを始めましょう';
+    if (soundOn.checked) startSoundLoop(msg); else showToast(msg.replace('\n', ''));
     if (autoSwitch.checked) setTimeout(() => { applyMode('work'); syncActiveTab('work'); }, 1200);
   }
 }
@@ -1261,12 +1338,12 @@ function updateClock() {
 }
 
 function triggerAlarm() {
-  playMcSound(alarmSound);
-  showToast('⏰ 目覚まし時刻です！');
+  startSoundLoop('⏰ 目覚まし\n時刻です！');
   if (Notification.permission === 'granted') {
     new Notification('⏰ MIZUKING TIMER', { body: '目覚まし時刻です！' });
   }
-  setTimeout(() => { alarmEnabled = false; updateAlarmUI(); }, 400);
+  alarmEnabled = false;
+  updateAlarmUI();
 }
 
 function playMcSound(type) {
@@ -1399,6 +1476,34 @@ alarmInput.addEventListener('change', () => {
 
 setInterval(updateClock, 1000);
 updateClock();
+
+// --- サウンドループ ---
+const SOUND_DUR = { creeper: 2600, zombie: 2600, enderman: 2100, pig: 1900, skeleton: 1700 };
+const SOUND_NAME = { creeper:'💚 クリーパー', zombie:'🧟 ゾンビ', enderman:'👁 エンダーマン', pig:'🐷 ブタ', skeleton:'💀 スケルトン' };
+let soundLooping   = false;
+let soundLoopTimer = null;
+
+function startSoundLoop(msg) {
+  stopSoundLoop();
+  soundLooping = true;
+  document.getElementById('stopPopupMsg').innerHTML  = msg.replace('\n', '<br>');
+  document.getElementById('stopPopupSound').textContent = SOUND_NAME[alarmSound] || '';
+  document.getElementById('stopPopup').classList.add('show');
+  (function loop() {
+    if (!soundLooping) return;
+    playMcSound(alarmSound);
+    soundLoopTimer = setTimeout(loop, (SOUND_DUR[alarmSound] || 2200) + 350);
+  })();
+}
+
+function stopSoundLoop() {
+  soundLooping = false;
+  clearTimeout(soundLoopTimer);
+  soundLoopTimer = null;
+  document.getElementById('stopPopup').classList.remove('show');
+}
+
+document.getElementById('stopSoundBtn').addEventListener('click', stopSoundLoop);
 
 // --- ウィジェットモード ---
 (function () {
