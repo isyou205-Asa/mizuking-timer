@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>MIZUKING TIMER</title>
+  <meta name="theme-color" content="#e74c3c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MIZUKING">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="./icon.png">
+  <link rel="apple-touch-icon" sizes="167x167" href="./icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="./icon.png">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-dark: #1a1a2e;
+      --text: #eee;
+      --text-dim: #888;
+    }
+
+    #bgCanvas {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: transparent;
+      color: var(--text);
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      user-select: none;
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: rgba(6, 10, 24, 0.72);
+      z-index: -1;
+    }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 300;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .gear-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 0.2rem 0.4rem;
+      border-radius: 6px;
+      transition: color 0.2s, background 0.2s;
+      line-height: 1;
+    }
+    .gear-btn:hover { color: var(--text); background: #ffffff12; }
+
+    .mode-tabs { display: flex; gap: 0.5rem; }
+
+    .mode-tab {
+      padding: 0.4rem 1.2rem;
+      border: none;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+    .mode-tab.active {
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+
+    .timer-wrap {
+      position: relative;
+      width: 280px;
+      height: 280px;
+    }
+
+    .timer-svg {
+      transform: rotate(-90deg);
+      width: 100%;
+      height: 100%;
+    }
+
+    .ring-bg { fill: none; stroke: #ffffff0f; stroke-width: 10; }
+
+    .ring-progress {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 10;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.5s ease, stroke 0.4s ease;
+    }
+
+    .timer-center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.25rem;
+    }
+
+    #display {
+      font-size: 2.4rem;
+      font-weight: 200;
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .mode-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--text-dim);
+    }
+
+    .controls { display: flex; gap: 1rem; align-items: center; }
+
+    .btn {
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      transition: all 0.2s;
+    }
+    .btn:active { transform: scale(0.95); }
+
+    #startBtn {
+      background: var(--accent);
+      color: white;
+      padding: 0.75rem 2.5rem;
+      font-size: 1rem;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+    #startBtn:hover { filter: brightness(1.15); }
+
+    #resetBtn {
+      background: #ffffff12;
+      color: var(--text-dim);
+      padding: 0.75rem 1.25rem;
+      font-size: 0.85rem;
+    }
+    #resetBtn:hover { background: #ffffff22; color: var(--text); }
+
+    .session-info { display: flex; gap: 2rem; text-align: center; }
+
+    .session-stat { display: flex; flex-direction: column; gap: 0.25rem; }
+
+    .stat-value { font-size: 1.6rem; font-weight: 600; }
+
+    .stat-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-dim);
+    }
+
+    .tomato-row { display: flex; gap: 0.4rem; height: 1.5rem; align-items: center; }
+
+    .tomato { font-size: 1.1rem; transition: transform 0.3s; }
+    .tomato.done { animation: pop 0.4s ease; }
+
+    @keyframes pop {
+      0%  { transform: scale(1); }
+      50% { transform: scale(1.5); }
+      100%{ transform: scale(1); }
+    }
+
+    .toast {
+      position: fixed;
+      top: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(-80px);
+      background: var(--accent);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      box-shadow: 0 4px 20px #0005;
+      transition: transform 0.4s cubic-bezier(.175,.885,.32,1.275);
+      pointer-events: none;
+      z-index: 10;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    .settings-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+    .settings-row label { display: flex; align-items: center; gap: 0.3rem; cursor: pointer; }
+    .settings-row input[type=checkbox] { accent-color: var(--accent); width: 1rem; height: 1rem; cursor: pointer; }
+
+    /* --- Modal --- */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: #00000088;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+    .modal {
+      background: #0f172a;
+      border: 1px solid #ffffff15;
+      border-radius: 1.2rem;
+      padding: 1.75rem;
+      width: min(400px, 95vw);
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      box-shadow: 0 20px 60px #0008;
+      transform: translateY(16px) scale(0.97);
+      transition: transform 0.25s cubic-bezier(.175,.885,.32,1.275);
+    }
+    .modal-overlay.open .modal { transform: translateY(0) scale(1); }
+
+    .modal h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .mode-sections { display: flex; flex-direction: column; gap: 1rem; }
+
+    .mode-section { display: flex; flex-direction: column; gap: 0.4rem; }
+
+    .mode-name-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .mode-name-input {
+      flex: 1;
+      background: #ffffff0a;
+      border: 1px solid #ffffff15;
+      border-radius: 0.5rem;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.3rem 0.6rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .mode-name-input:focus { border-color: var(--accent); }
+    .mode-name-input::placeholder { color: var(--text-dim); }
+
+    .mode-time-row {
+      display: flex;
+      gap: 0.4rem;
+      padding-left: 1.4rem;
+    }
+
+    .time-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: #ffffff0a;
+      border: 1px solid #ffffff15;
+      border-radius: 0.6rem;
+      padding: 0.3rem 0.5rem;
+      flex: 1;
+    }
+    .time-input-wrap:focus-within { border-color: var(--accent); }
+
+    .step-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      font-size: 1rem;
+      cursor: pointer;
+      padding: 0 0.1rem;
+      line-height: 1;
+      transition: color 0.15s;
+      flex-shrink: 0;
+    }
+    .step-btn:hover { color: var(--text); }
+
+    .hms-input {
+      width: 2ch;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 1rem;
+      font-weight: 600;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      outline: none;
+      flex: 1;
+      min-width: 0;
+      -moz-appearance: textfield;
+    }
+    .hms-input::-webkit-outer-spin-button,
+    .hms-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    .unit-label {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: flex-end;
+    }
+    .modal-actions .btn { padding: 0.55rem 1.4rem; font-size: 0.9rem; }
+
+    #saveSettings {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 2px 12px var(--accent-glow);
+    }
+    #saveSettings:hover { filter: brightness(1.15); }
+
+    #cancelSettings { background: #ffffff12; color: var(--text-dim); }
+    #cancelSettings:hover { background: #ffffff20; color: var(--text); }
+
+    .modal-divider {
+      border: none;
+      border-top: 1px solid #ffffff0f;
+      margin: 0;
+    }
+
+    .icon-setting-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .icon-setting-label {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    .icon-options {
+      display: flex;
+      gap: 0.3rem;
+    }
+
+    .icon-opt {
+      background: #ffffff0a;
+      border: 2px solid transparent;
+      border-radius: 0.5rem;
+      font-size: 1.3rem;
+      width: 2.2rem;
+      height: 2.2rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+    .icon-opt:hover { background: #ffffff18; }
+    .icon-opt.selected { border-color: var(--accent); background: #ffffff18; }
+
+    .icon-custom-input {
+      width: 2.8rem;
+      background: #ffffff0a;
+      border: 2px solid #ffffff15;
+      border-radius: 0.5rem;
+      color: var(--text);
+      font-size: 1.2rem;
+      text-align: center;
+      padding: 0.2rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .icon-custom-input:focus { border-color: var(--accent); }
+
+    .current-clock {
+      font-size: 2.4rem;
+      font-weight: 200;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.08em;
+    }
+
+    .alarm-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .alarm-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: #ffffff08;
+      border: 1px solid #ffffff12;
+      border-radius: 999px;
+      padding: 0.45rem 1rem;
+      transition: border-color 0.2s;
+    }
+
+    .alarm-row.active {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+    }
+
+    .alarm-bell { font-size: 1rem; line-height: 1; }
+
+    .alarm-time-input {
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 0.95rem;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.05em;
+      outline: none;
+      cursor: pointer;
+      width: 5.5rem;
+    }
+    .alarm-time-input::-webkit-calendar-picker-indicator {
+      filter: invert(0.6);
+      cursor: pointer;
+    }
+
+    .alarm-toggle-btn {
+      background: #ffffff12;
+      color: var(--text-dim);
+      border: none;
+      border-radius: 999px;
+      padding: 0.2rem 0.8rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .alarm-toggle-btn.active {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 2px 8px var(--accent-glow);
+    }
+
+    .alarm-next {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      letter-spacing: 0.05em;
+      min-height: 1em;
+    }
+
+    .alarm-sound-row {
+      display: flex;
+      gap: 0.3rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .alarm-sound-btn {
+      background: #ffffff08;
+      border: 1.5px solid #ffffff15;
+      border-radius: 999px;
+      color: var(--text-dim);
+      font-size: 0.7rem;
+      padding: 0.22rem 0.6rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .alarm-sound-btn:hover { background: #ffffff18; color: var(--text); }
+    .alarm-sound-btn.active {
+      border-color: var(--accent);
+      color: var(--text);
+      background: color-mix(in srgb, var(--accent) 15%, transparent);
+    }
+
+    .mc-tomato {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      background: no-repeat center / contain;
+      image-rendering: pixelated;
+      font-size: 0;
+      vertical-align: middle;
+    }
+
+    /* ── Apple Watch（〜200px）── */
+    @media (max-width: 200px) {
+      #bgCanvas { display: none; }
+      body::before { background: rgba(6, 10, 24, 0.98); }
+      body { gap: 0.25rem; padding: 0.4rem 0.2rem; justify-content: flex-start; padding-top: 0.6rem; }
+      .header-row,
+      .mode-tabs,
+      .session-info,
+      .alarm-section,
+      .settings-row,
+      .gear-btn,
+      .mini-btn { display: none !important; }
+      .current-clock {
+        font-size: 1.55rem;
+        letter-spacing: 0.01em;
+        order: 1;
+      }
+      .watch-mode-row { display: flex; order: 2; }
+      .timer-wrap { width: 120px; height: 120px; order: 3; }
+      #display { font-size: 1.1rem; }
+      .mode-label { font-size: 0.55rem; }
+      .ring-bg, .ring-progress { stroke-width: 8; }
+      .controls { order: 4; gap: 0; }
+      #resetBtn { display: none; }
+      #startBtn { padding: 0.45rem 1rem; font-size: 0.78rem; border-radius: 999px; }
+    }
+
+    /* Apple Watch モード行（通常は非表示） */
+    .watch-mode-row {
+      display: none;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.6rem;
+      color: var(--text-dim);
+    }
+    .watch-mode-row .wd { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+
+    /* Apple Watch ミニマイクラシーン */
+    .watch-mc-scene { display: none; }
+    @media (max-width: 200px) {
+      .watch-mc-scene {
+        display: flex;
+        align-items: flex-end;
+        gap: 1px;
+        margin-top: 0.25rem;
+        image-rendering: pixelated;
+        order: 5;
+      }
+      .watch-mc-tree { display: flex; flex-direction: column; gap: 1px; }
+      .watch-mc-ground { display: flex; gap: 1px; }
+    }
+
+    /* ── iPad / タブレット（600px以上）── */
+    @media (min-width: 600px) {
+      body { gap: 2.4rem; }
+      .timer-wrap { width: 340px; height: 340px; }
+      #display { font-size: 3rem; }
+      .current-clock { font-size: 3rem; }
+      h1 { font-size: 1.7rem; }
+      .mode-tab { font-size: 0.95rem; padding: 0.5rem 1.6rem; }
+      .stat-value { font-size: 2rem; }
+      .alarm-row { padding: 0.55rem 1.4rem; }
+      .alarm-time-input { font-size: 1.1rem; width: 6rem; }
+    }
+
+    /* ── iPad Pro / 大画面（1024px以上）── */
+    @media (min-width: 1024px) {
+      .timer-wrap { width: 380px; height: 380px; }
+      #display { font-size: 3.4rem; }
+      .current-clock { font-size: 3.4rem; }
+    }
+
+    /* ── ランドスケープ（横向き）── */
+    @media (orientation: landscape) and (max-height: 600px) {
+      body { flex-direction: row; flex-wrap: wrap; gap: 1rem; padding: 0.5rem 1.5rem; justify-content: center; align-items: center; }
+      .header-row { width: 100%; justify-content: center; margin-bottom: -0.5rem; }
+      .current-clock { font-size: 1.6rem; order: -1; }
+      .mode-tabs { width: 100%; justify-content: center; }
+      .timer-wrap { width: 200px; height: 200px; flex-shrink: 0; }
+      #display { font-size: 1.8rem; }
+      .controls { flex-direction: column; gap: 0.5rem; }
+      .session-info { flex-direction: column; gap: 0.5rem; }
+      .alarm-section, .settings-row { width: 100%; align-items: center; }
+    }
+
+    /* ── ミニボタン ── */
+    .mini-btn {
+      background: none;
+      border: 1px solid #ffffff20;
+      border-radius: 6px;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 0.15rem 0.45rem;
+      line-height: 1;
+      transition: all 0.2s;
+    }
+    .mini-btn:hover { color: var(--text); background: #ffffff12; }
+
+    /* ── ウィジェットモード（?mini=1）── */
+    body.widget-mode { gap: 0.5rem; }
+    body.widget-mode .header-row,
+    body.widget-mode .mode-tabs,
+    body.widget-mode .session-info,
+    body.widget-mode .alarm-section,
+    body.widget-mode .settings-row { display: none; }
+    body.widget-mode .current-clock { font-size: 2.4rem; }
+    body.widget-mode .timer-wrap { width: 170px; height: 170px; }
+    body.widget-mode #display { font-size: 1.7rem; }
+    body.widget-mode #resetBtn { display: none; }
+    body.widget-mode .widget-bar { display: flex; }
+
+    /* ウィジェット下部ステータス */
+    .widget-bar {
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+    .widget-bar .wb-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div class="toast" id="toast"></div>
+
+<div class="header-row">
+  <h1>🍅 MIZUKING TIMER</h1>
+  <button class="gear-btn" id="gearBtn" title="設定">⚙️</button>
+  <button class="mini-btn" id="miniBtn" title="ウィジェットで開く">⊞</button>
+</div>
+<div class="current-clock" id="currentClock">--:--:--</div>
+<div class="watch-mode-row" id="watchModeRow">
+  <span class="wd"></span>
+  <span id="watchModeLabel">壱</span>
+</div>
+
+<div class="mode-tabs" id="modeTabs">
+  <button class="mode-tab active" data-mode="work">壱 25分</button>
+  <button class="mode-tab"        data-mode="short">弐 5分</button>
+  <button class="mode-tab"        data-mode="long">参 15分</button>
+</div>
+
+<div class="timer-wrap">
+  <svg class="timer-svg" viewBox="0 0 100 100">
+    <circle class="ring-bg" cx="50" cy="50" r="44"/>
+    <circle class="ring-progress" id="ring" cx="50" cy="50" r="44"
+            stroke-dasharray="276.46" stroke-dashoffset="0"/>
+  </svg>
+  <div class="timer-center">
+    <div id="display">00:25:00</div>
+    <div class="mode-label" id="modeLabel">壱</div>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn" id="resetBtn">リセット</button>
+  <button class="btn" id="startBtn">スタート</button>
+</div>
+
+<!-- Apple Watch ミニマイクラシーン -->
+<div class="watch-mc-scene" aria-hidden="true">
+  <div class="watch-mc-tree">
+    <svg width="14" height="14" viewBox="0 0 16 16" style="image-rendering:pixelated;display:block"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#5EAA28"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#4A8C1E"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#2F6010"/></svg>
+    <svg width="14" height="14" viewBox="0 0 16 16" style="image-rendering:pixelated;display:block"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#C8A464"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#B08040"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#805C20"/></svg>
+  </div>
+  <div class="watch-mc-ground">
+    <svg width="14" height="14" viewBox="0 0 16 16" style="image-rendering:pixelated;display:block"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#79C05A"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#866043"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#5C3A20"/></svg>
+    <svg width="14" height="14" viewBox="0 0 16 16" style="image-rendering:pixelated;display:block"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#79C05A"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#866043"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#5C3A20"/></svg>
+    <svg width="14" height="14" viewBox="0 0 16 16" style="image-rendering:pixelated;display:block"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#79C05A"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#866043"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#5C3A20"/></svg>
+    <svg width="14" height="14" viewBox="0 0 16 16" style="image-rendering:pixelated;display:block"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#79C05A"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#866043"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#5C3A20"/></svg>
+    <svg width="14" height="14" viewBox="0 0 16 16" style="image-rendering:pixelated;display:block"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#79C05A"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#866043"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#5C3A20"/></svg>
+    <svg width="14" height="14" viewBox="0 0 16 16" style="image-rendering:pixelated;display:block"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#79C05A"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#866043"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#5C3A20"/></svg>
+    <svg width="14" height="14" viewBox="0 0 16 16" style="image-rendering:pixelated;display:block"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#5CE8F0"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#38C8D8"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#1898A8"/></svg>
+    <svg width="14" height="14" viewBox="0 0 16 16" style="image-rendering:pixelated;display:block"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#79C05A"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#866043"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#5C3A20"/></svg>
+    <svg width="14" height="14" viewBox="0 0 16 16" style="image-rendering:pixelated;display:block"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#79C05A"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#866043"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#5C3A20"/></svg>
+  </div>
+</div>
+
+<div class="session-info">
+  <div class="session-stat">
+    <span class="stat-value" id="completedCount">0</span>
+    <span class="stat-label">完了セッション</span>
+  </div>
+  <div class="session-stat">
+    <div class="tomato-row" id="tomatoRow">
+      <span class="tomato">🍅</span>
+      <span class="tomato">🍅</span>
+      <span class="tomato">🍅</span>
+      <span class="tomato">🍅</span>
+    </div>
+    <span class="stat-label">次の長休憩まで</span>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>⚙️ 設定</h2>
+
+    <div class="icon-setting-row">
+      <span class="icon-setting-label">カウンターアイコン</span>
+      <div class="icon-options" id="iconOptions">
+        <button class="icon-opt" data-icon="__mc_grass__" title="草ブロック" style="padding:3px">
+          <svg width="18" height="18" viewBox="0 0 16 16" style="image-rendering:pixelated"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#79C05A"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#866043"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#5C3A20"/></svg>
+        </button>
+        <button class="icon-opt" data-icon="__mc_stone__" title="石ブロック" style="padding:3px">
+          <svg width="18" height="18" viewBox="0 0 16 16" style="image-rendering:pixelated"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#9A9A9A"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#888888"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#666666"/></svg>
+        </button>
+        <button class="icon-opt" data-icon="__mc_diamond__" title="ダイヤモンドブロック" style="padding:3px">
+          <svg width="18" height="18" viewBox="0 0 16 16" style="image-rendering:pixelated"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#5CE8F0"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#38C8D8"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#1898A8"/></svg>
+        </button>
+        <button class="icon-opt" data-icon="__mc_gold__" title="金ブロック" style="padding:3px">
+          <svg width="18" height="18" viewBox="0 0 16 16" style="image-rendering:pixelated"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#FAEE22"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#E8CC10"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#B89800"/></svg>
+        </button>
+        <button class="icon-opt" data-icon="__mc_red__" title="レッドストーンブロック" style="padding:3px">
+          <svg width="18" height="18" viewBox="0 0 16 16" style="image-rendering:pixelated"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#E83030"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#C01818"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#880808"/></svg>
+        </button>
+        <button class="icon-opt" data-icon="__mc_emerald__" title="エメラルドブロック" style="padding:3px">
+          <svg width="18" height="18" viewBox="0 0 16 16" style="image-rendering:pixelated"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#20E870"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#10C050"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#088030"/></svg>
+        </button>
+        <button class="icon-opt" data-icon="__mc_wood__" title="木材ブロック" style="padding:3px">
+          <svg width="18" height="18" viewBox="0 0 16 16" style="image-rendering:pixelated"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="#C8A464"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="#B08040"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="#805C20"/></svg>
+        </button>
+      </div>
+      <input class="icon-custom-input" id="iconCustom" type="text" maxlength="2" placeholder="✏️">
+    </div>
+
+    <hr class="modal-divider">
+
+    <div class="mode-sections">
+
+      <!-- 壱 -->
+      <div class="mode-section">
+        <div class="mode-name-row">
+          <span class="dot" style="background:#e74c3c"></span>
+          <input class="mode-name-input" id="nameWork" type="text" maxlength="12" placeholder="壱">
+        </div>
+        <div class="mode-time-row">
+          <div class="time-input-wrap">
+            <button class="step-btn" data-target="wH" data-delta="-1" data-min="0" data-max="23">−</button>
+            <input class="hms-input" id="wH" type="number" min="0" max="23" value="0">
+            <button class="step-btn" data-target="wH" data-delta="1" data-min="0" data-max="23">＋</button>
+            <span class="unit-label">時</span>
+          </div>
+          <div class="time-input-wrap">
+            <button class="step-btn" data-target="wM" data-delta="-1" data-min="0" data-max="59">−</button>
+            <input class="hms-input" id="wM" type="number" min="0" max="59" value="25">
+            <button class="step-btn" data-target="wM" data-delta="1" data-min="0" data-max="59">＋</button>
+            <span class="unit-label">分</span>
+          </div>
+          <div class="time-input-wrap">
+            <button class="step-btn" data-target="wS" data-delta="-1" data-min="0" data-max="59">−</button>
+            <input class="hms-input" id="wS" type="number" min="0" max="59" value="0">
+            <button class="step-btn" data-target="wS" data-delta="1" data-min="0" data-max="59">＋</button>
+            <span class="unit-label">秒</span>
+          </div>
+        </div>
+      </div>
+
+      <hr class="modal-divider">
+
+      <!-- 弐 -->
+      <div class="mode-section">
+        <div class="mode-name-row">
+          <span class="dot" style="background:#27ae60"></span>
+          <input class="mode-name-input" id="nameShort" type="text" maxlength="12" placeholder="弐">
+        </div>
+        <div class="mode-time-row">
+          <div class="time-input-wrap">
+            <button class="step-btn" data-target="sH" data-delta="-1" data-min="0" data-max="23">−</button>
+            <input class="hms-input" id="sH" type="number" min="0" max="23" value="0">
+            <button class="step-btn" data-target="sH" data-delta="1" data-min="0" data-max="23">＋</button>
+            <span class="unit-label">時</span>
+          </div>
+          <div class="time-input-wrap">
+            <button class="step-btn" data-target="sM" data-delta="-1" data-min="0" data-max="59">−</button>
+            <input class="hms-input" id="sM" type="number" min="0" max="59" value="5">
+            <button class="step-btn" data-target="sM" data-delta="1" data-min="0" data-max="59">＋</button>
+            <span class="unit-label">分</span>
+          </div>
+          <div class="time-input-wrap">
+            <button class="step-btn" data-target="sS" data-delta="-1" data-min="0" data-max="59">−</button>
+            <input class="hms-input" id="sS" type="number" min="0" max="59" value="0">
+            <button class="step-btn" data-target="sS" data-delta="1" data-min="0" data-max="59">＋</button>
+            <span class="unit-label">秒</span>
+          </div>
+        </div>
+      </div>
+
+      <hr class="modal-divider">
+
+      <!-- 参 -->
+      <div class="mode-section">
+        <div class="mode-name-row">
+          <span class="dot" style="background:#2980b9"></span>
+          <input class="mode-name-input" id="nameLong" type="text" maxlength="12" placeholder="参">
+        </div>
+        <div class="mode-time-row">
+          <div class="time-input-wrap">
+            <button class="step-btn" data-target="lH" data-delta="-1" data-min="0" data-max="23">−</button>
+            <input class="hms-input" id="lH" type="number" min="0" max="23" value="0">
+            <button class="step-btn" data-target="lH" data-delta="1" data-min="0" data-max="23">＋</button>
+            <span class="unit-label">時</span>
+          </div>
+          <div class="time-input-wrap">
+            <button class="step-btn" data-target="lM" data-delta="-1" data-min="0" data-max="59">−</button>
+            <input class="hms-input" id="lM" type="number" min="0" max="59" value="15">
+            <button class="step-btn" data-target="lM" data-delta="1" data-min="0" data-max="59">＋</button>
+            <span class="unit-label">分</span>
+          </div>
+          <div class="time-input-wrap">
+            <button class="step-btn" data-target="lS" data-delta="-1" data-min="0" data-max="59">−</button>
+            <input class="hms-input" id="lS" type="number" min="0" max="59" value="0">
+            <button class="step-btn" data-target="lS" data-delta="1" data-min="0" data-max="59">＋</button>
+            <span class="unit-label">秒</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="cancelSettings">キャンセル</button>
+      <button class="btn" id="saveSettings">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="alarm-section">
+  <div class="alarm-row" id="alarmRow">
+    <span class="alarm-bell" id="alarmBell">🔕</span>
+    <input type="time" id="alarmInput" class="alarm-time-input">
+    <button class="alarm-toggle-btn" id="alarmToggle">オフ</button>
+  </div>
+  <div class="alarm-next" id="alarmNext"></div>
+  <div class="alarm-sound-row" id="alarmSoundRow">
+    <button class="alarm-sound-btn active" data-sound="creeper">💚 クリーパー</button>
+    <button class="alarm-sound-btn" data-sound="zombie">🧟 ゾンビ</button>
+    <button class="alarm-sound-btn" data-sound="enderman">👁 エンダーマン</button>
+    <button class="alarm-sound-btn" data-sound="pig">🐷 ブタ</button>
+    <button class="alarm-sound-btn" data-sound="skeleton">💀 スケルトン</button>
+  </div>
+</div>
+
+<div class="widget-bar" id="widgetBar">
+  <span class="wb-dot"></span>
+  <span id="wbLabel">壱</span>
+  <span id="wbAlarm"></span>
+</div>
+
+<div class="settings-row">
+  <label><input type="checkbox" id="autoSwitch"> セッション終了後に自動で次へ</label>
+  <label><input type="checkbox" id="soundOn" checked> 通知音</label>
+</div>
+
+<script>
+const saved = JSON.parse(localStorage.getItem('pomodoroTimes') || '{}');
+let tomatoIcon = saved.tomatoIcon === '__mc__' ? '__mc_grass__' : (saved.tomatoIcon ?? '__mc_grass__');
+
+const MODES = {
+  work:  { label: saved.workLabel  ?? '壱', color: '#e74c3c', glow: '#e74c3c55', h: saved.wH ?? 0, m: saved.wM ?? 25, s: saved.wS ?? 0 },
+  short: { label: saved.shortLabel ?? '弐', color: '#27ae60', glow: '#27ae6055', h: saved.sH ?? 0, m: saved.sM ?? 5,  s: saved.sS ?? 0 },
+  long:  { label: saved.longLabel  ?? '参', color: '#2980b9', glow: '#2980b955', h: saved.lH ?? 0, m: saved.lM ?? 15, s: saved.lS ?? 0 },
+};
+
+const CIRCUMFERENCE = 2 * Math.PI * 44;
+
+let currentMode = 'work';
+let totalSeconds = toSec(MODES.work);
+let remaining   = totalSeconds;
+let running     = false;
+let interval    = null;
+let completed   = 0;
+
+const display        = document.getElementById('display');
+const ring           = document.getElementById('ring');
+const modeLabel      = document.getElementById('modeLabel');
+const startBtn       = document.getElementById('startBtn');
+const resetBtn       = document.getElementById('resetBtn');
+const completedCount = document.getElementById('completedCount');
+const tomatoRow      = document.getElementById('tomatoRow');
+const toast          = document.getElementById('toast');
+const autoSwitch     = document.getElementById('autoSwitch');
+const soundOn        = document.getElementById('soundOn');
+const gearBtn        = document.getElementById('gearBtn');
+const modalOverlay   = document.getElementById('modalOverlay');
+
+function toSec({ h, m, s }) { return h * 3600 + m * 60 + s; }
+
+function fmtDisplay(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+}
+
+function fmtTab(mode) {
+  const { h, m, s } = MODES[mode];
+  const parts = [];
+  if (h) parts.push(`${h}時`);
+  if (m) parts.push(`${m}分`);
+  if (s) parts.push(`${s}秒`);
+  return parts.length ? parts.join('') : '0秒';
+}
+
+function setAccent(mode) {
+  document.documentElement.style.setProperty('--accent',      MODES[mode].color);
+  document.documentElement.style.setProperty('--accent-glow', MODES[mode].glow);
+}
+
+function applyMode(mode) {
+  currentMode  = mode;
+  totalSeconds = toSec(MODES[mode]);
+  if (totalSeconds === 0) totalSeconds = 1;
+  remaining    = totalSeconds;
+  running      = false;
+  clearInterval(interval);
+  startBtn.textContent  = 'スタート';
+  modeLabel.textContent = MODES[mode].label;
+  setAccent(mode);
+  const wml = document.getElementById('watchModeLabel');
+  if (wml) wml.textContent = MODES[mode].label;
+  updateDisplay();
+  updateRing(1);
+}
+
+function updateDisplay() {
+  display.textContent = fmtDisplay(remaining);
+  document.title = `${fmtDisplay(remaining)} — Pomodoro`;
+}
+
+function updateRing(ratio) {
+  ring.style.strokeDashoffset = CIRCUMFERENCE * (1 - ratio);
+}
+
+function tick() {
+  if (remaining <= 0) {
+    clearInterval(interval);
+    running = false;
+    startBtn.textContent = 'スタート';
+    onComplete();
+    return;
+  }
+  remaining--;
+  updateDisplay();
+  updateRing(remaining / totalSeconds);
+}
+
+function onComplete() {
+  playBeep();
+  if (currentMode === 'work') {
+    completed++;
+    completedCount.textContent = completed;
+    updateTomatoes();
+    const isLong = completed % 4 === 0;
+    showToast(isLong ? '🎉 お疲れさまです！長休憩にしましょう' : '✅ 集中完了！休憩しましょう');
+    if (autoSwitch.checked) setTimeout(() => { const next = isLong ? 'long' : 'short'; applyMode(next); syncActiveTab(next); }, 1200);
+  } else {
+    showToast('⏰ 休憩終了！集中タイムを始めましょう');
+    if (autoSwitch.checked) setTimeout(() => { applyMode('work'); syncActiveTab('work'); }, 1200);
+  }
+}
+
+function syncActiveTab(mode) {
+  const map = { work: 0, short: 1, long: 2 };
+  document.querySelectorAll('.mode-tab').forEach((t, i) => t.classList.toggle('active', i === map[mode]));
+}
+
+function updateTabLabels() {
+  const tabs = document.querySelectorAll('.mode-tab');
+  tabs[0].textContent = `${MODES.work.label} ${fmtTab('work')}`;
+  tabs[1].textContent = `${MODES.short.label} ${fmtTab('short')}`;
+  tabs[2].textContent = `${MODES.long.label} ${fmtTab('long')}`;
+}
+
+const MC_BLOCKS = {
+  __mc_grass__:   { top:'#79C05A', mid:'#866043', side:'#5C3A20' },
+  __mc_stone__:   { top:'#9A9A9A', mid:'#888888', side:'#666666' },
+  __mc_diamond__: { top:'#5CE8F0', mid:'#38C8D8', side:'#1898A8' },
+  __mc_gold__:    { top:'#FAEE22', mid:'#E8CC10', side:'#B89800' },
+  __mc_red__:     { top:'#E83030', mid:'#C01818', side:'#880808' },
+  __mc_emerald__: { top:'#20E870', mid:'#10C050', side:'#088030' },
+  __mc_wood__:    { top:'#C8A464', mid:'#B08040', side:'#805C20' },
+};
+
+function isMcBlock(icon) { return icon && icon.startsWith('__mc_'); }
+
+function mcSvgInline(icon, w = 20) {
+  const b = MC_BLOCKS[icon] || MC_BLOCKS.__mc_grass__;
+  return `<svg width="${w}" height="${w}" viewBox="0 0 16 16" style="vertical-align:-3px;image-rendering:pixelated"><polygon points="8,1 15,4.5 8,8 1,4.5" fill="${b.top}"/><polygon points="1,4.5 8,8 8,15 1,11.5" fill="${b.mid}"/><polygon points="8,8 15,4.5 15,11.5 8,15" fill="${b.side}"/></svg>`;
+}
+
+function mcDataUrl(icon, alpha = 1) {
+  const b = MC_BLOCKS[icon] || MC_BLOCKS.__mc_stone__;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><polygon points='8,1 15,4.5 8,8 1,4.5' fill='${b.top}'/><polygon points='1,4.5 8,8 8,15 1,11.5' fill='${b.mid}'/><polygon points='8,8 15,4.5 15,11.5 8,15' fill='${b.side}'/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
+function setTomatoSpan(el, filled, pop = false) {
+  if (isMcBlock(tomatoIcon)) {
+    el.textContent = '';
+    el.className = 'tomato mc-tomato';
+    el.style.backgroundImage = filled ? mcDataUrl(tomatoIcon) : mcDataUrl('__mc_stone__');
+    el.style.opacity = filled ? '1' : '0.3';
+  } else {
+    el.className = 'tomato';
+    el.style.backgroundImage = '';
+    el.style.opacity = '';
+    el.textContent = filled ? tomatoIcon : '⬜';
+  }
+  if (pop) { el.classList.remove('done'); void el.offsetWidth; el.classList.add('done'); }
+}
+
+function updateTomatoes() {
+  const slot = (completed - 1) % 4;
+  tomatoRow.querySelectorAll('.tomato').forEach((t, i) => setTomatoSpan(t, i <= slot, i === slot));
+  if (completed % 4 === 0) setTimeout(() => tomatoRow.querySelectorAll('.tomato').forEach(t => setTomatoSpan(t, true)), 600);
+}
+
+function refreshTomatoDisplay() {
+  tomatoRow.querySelectorAll('.tomato').forEach(t => {
+    const filled = t.style.opacity !== '0.3' && t.textContent !== '⬜';
+    setTomatoSpan(t, filled);
+  });
+  const h1 = document.querySelector('h1');
+  if (isMcBlock(tomatoIcon)) {
+    h1.innerHTML = `${mcSvgInline(tomatoIcon)} MIZUKING TIMER`;
+  } else {
+    h1.textContent = `${tomatoIcon} MIZUKING TIMER`;
+  }
+  // Apple Watch モード行のドット → MCブロックアイコン
+  const wd = document.querySelector('.watch-mode-row .wd');
+  if (wd) {
+    if (isMcBlock(tomatoIcon)) {
+      wd.style.cssText = 'background:none;width:auto;height:auto;border-radius:0';
+      wd.innerHTML = mcSvgInline(tomatoIcon, 11);
+    } else {
+      wd.style.cssText = '';
+      wd.innerHTML = tomatoIcon || '';
+    }
+  }
+}
+
+function playBeep() {
+  if (!soundOn.checked) return;
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  [0, 0.2, 0.4].forEach(delay => {
+    const osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 880; osc.type = 'sine';
+    gain.gain.setValueAtTime(0.4, ctx.currentTime + delay);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.3);
+    osc.start(ctx.currentTime + delay); osc.stop(ctx.currentTime + delay + 0.35);
+  });
+}
+
+let toastTimer;
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+startBtn.addEventListener('click', () => {
+  if (running) {
+    clearInterval(interval); running = false; startBtn.textContent = 'スタート';
+  } else {
+    running = true; startBtn.textContent = '一時停止'; interval = setInterval(tick, 1000);
+  }
+});
+
+resetBtn.addEventListener('click', () => { clearInterval(interval); applyMode(currentMode); });
+
+document.getElementById('modeTabs').addEventListener('click', e => {
+  const tab = e.target.closest('.mode-tab');
+  if (!tab) return;
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  applyMode(tab.dataset.mode);
+});
+
+// --- Settings modal ---
+function openModal() {
+  // icon picker state
+  const custom = document.getElementById('iconCustom');
+  const presets = Object.keys(MC_BLOCKS);
+  document.querySelectorAll('.icon-opt').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.icon === tomatoIcon);
+  });
+  custom.value = presets.includes(tomatoIcon) ? '' : tomatoIcon;
+
+  document.getElementById('nameWork').value  = MODES.work.label;
+  document.getElementById('nameShort').value = MODES.short.label;
+  document.getElementById('nameLong').value  = MODES.long.label;
+  document.getElementById('wH').value = MODES.work.h;
+  document.getElementById('wM').value = MODES.work.m;
+  document.getElementById('wS').value = MODES.work.s;
+  document.getElementById('sH').value = MODES.short.h;
+  document.getElementById('sM').value = MODES.short.m;
+  document.getElementById('sS').value = MODES.short.s;
+  document.getElementById('lH').value = MODES.long.h;
+  document.getElementById('lM').value = MODES.long.m;
+  document.getElementById('lS').value = MODES.long.s;
+  modalOverlay.classList.add('open');
+}
+
+function closeModal() { modalOverlay.classList.remove('open'); }
+
+gearBtn.addEventListener('click', openModal);
+document.getElementById('cancelSettings').addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) closeModal(); });
+
+function readInt(id, fallback) { return Math.max(0, parseInt(document.getElementById(id).value) || fallback); }
+
+document.getElementById('saveSettings').addEventListener('click', () => {
+  const clampH = v => Math.min(23, v);
+  const clampMS = v => Math.min(59, v);
+
+  MODES.work.label  = document.getElementById('nameWork').value.trim()  || '壱';
+  MODES.short.label = document.getElementById('nameShort').value.trim() || '弐';
+  MODES.long.label  = document.getElementById('nameLong').value.trim()  || '参';
+
+  MODES.work.h  = clampH(readInt('wH', 0)); MODES.work.m  = clampMS(readInt('wM', 0)); MODES.work.s  = clampMS(readInt('wS', 0));
+  MODES.short.h = clampH(readInt('sH', 0)); MODES.short.m = clampMS(readInt('sM', 0)); MODES.short.s = clampMS(readInt('sS', 0));
+  MODES.long.h  = clampH(readInt('lH', 0)); MODES.long.m  = clampMS(readInt('lM', 0)); MODES.long.s  = clampMS(readInt('lS', 0));
+
+  if (toSec(MODES.work)  === 0) MODES.work.s  = 1;
+  if (toSec(MODES.short) === 0) MODES.short.s = 1;
+  if (toSec(MODES.long)  === 0) MODES.long.s  = 1;
+
+  // icon: custom input takes priority over preset button
+  const customVal = document.getElementById('iconCustom').value.trim();
+  const selectedBtn = document.querySelector('.icon-opt.selected');
+  tomatoIcon = customVal || (selectedBtn ? selectedBtn.dataset.icon : '🍅');
+  refreshTomatoDisplay();
+
+  localStorage.setItem('pomodoroTimes', JSON.stringify({
+    tomatoIcon,
+    workLabel: MODES.work.label, shortLabel: MODES.short.label, longLabel: MODES.long.label,
+    wH: MODES.work.h, wM: MODES.work.m, wS: MODES.work.s,
+    sH: MODES.short.h, sM: MODES.short.m, sS: MODES.short.s,
+    lH: MODES.long.h, lM: MODES.long.m, lS: MODES.long.s,
+  }));
+
+  updateTabLabels();
+  if (!running) applyMode(currentMode);
+  closeModal();
+  showToast('✅ 設定を保存しました');
+});
+
+// icon preset buttons
+document.getElementById('iconOptions').addEventListener('click', e => {
+  const btn = e.target.closest('.icon-opt');
+  if (!btn) return;
+  document.querySelectorAll('.icon-opt').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('iconCustom').value = '';
+});
+
+// typing in custom clears preset selection
+document.getElementById('iconCustom').addEventListener('input', () => {
+  document.querySelectorAll('.icon-opt').forEach(b => b.classList.remove('selected'));
+});
+
+document.querySelectorAll('.step-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById(btn.dataset.target);
+    const lo = parseInt(btn.dataset.min ?? 0);
+    const hi = parseInt(btn.dataset.max ?? 99);
+    input.value = Math.max(lo, Math.min(hi, (parseInt(input.value) || 0) + parseInt(btn.dataset.delta)));
+  });
+});
+
+// --- Alarm clock ---
+let alarmEnabled = false;
+let alarmFired   = false;
+let alarmSound   = localStorage.getItem('alarmSound') || 'creeper';
+
+const alarmInput  = document.getElementById('alarmInput');
+const alarmToggle = document.getElementById('alarmToggle');
+const alarmRow    = document.getElementById('alarmRow');
+const alarmBell   = document.getElementById('alarmBell');
+const alarmNext   = document.getElementById('alarmNext');
+const currentClock= document.getElementById('currentClock');
+
+// restore saved alarm time
+alarmInput.value = localStorage.getItem('alarmTime') || '';
+
+// init sound button active state
+document.querySelectorAll('.alarm-sound-btn').forEach(btn => {
+  btn.classList.toggle('active', btn.dataset.sound === alarmSound);
+});
+
+document.getElementById('alarmSoundRow').addEventListener('click', e => {
+  const btn = e.target.closest('.alarm-sound-btn');
+  if (!btn) return;
+  alarmSound = btn.dataset.sound;
+  localStorage.setItem('alarmSound', alarmSound);
+  document.querySelectorAll('.alarm-sound-btn').forEach(b => b.classList.toggle('active', b === btn));
+  // preview the sound
+  playMcSound(alarmSound);
+});
+
+function updateClock() {
+  const now = new Date();
+  const hh = now.getHours().toString().padStart(2, '0');
+  const mm = now.getMinutes().toString().padStart(2, '0');
+  const ss = now.getSeconds().toString().padStart(2, '0');
+  currentClock.textContent = `${hh}:${mm}:${ss}`;
+
+  if (alarmEnabled && alarmInput.value) {
+    const nowHM = `${hh}:${mm}`;
+    if (nowHM === alarmInput.value && !alarmFired) {
+      alarmFired = true;
+      triggerAlarm();
+    }
+    if (nowHM !== alarmInput.value) alarmFired = false;
+  }
+}
+
+function triggerAlarm() {
+  playMcSound(alarmSound);
+  showToast('⏰ 目覚まし時刻です！');
+  if (Notification.permission === 'granted') {
+    new Notification('⏰ MIZUKING TIMER', { body: '目覚まし時刻です！' });
+  }
+  setTimeout(() => { alarmEnabled = false; updateAlarmUI(); }, 400);
+}
+
+function playMcSound(type) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const fns = { creeper: mcCreeper, zombie: mcZombie, enderman: mcEnderman, pig: mcPig, skeleton: mcSkeleton };
+  (fns[type] || mcCreeper)(ctx);
+}
+
+// 💚 クリーパー: ジリジリ上昇 → ドーン
+function mcCreeper(ctx) {
+  const len = ctx.sampleRate * 1.5;
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const noise = ctx.createBufferSource();
+  noise.buffer = buf;
+  const hpf = ctx.createBiquadFilter();
+  hpf.type = 'highpass';
+  hpf.frequency.setValueAtTime(3000, ctx.currentTime);
+  hpf.frequency.linearRampToValueAtTime(9000, ctx.currentTime + 1.2);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.12, ctx.currentTime);
+  g.gain.linearRampToValueAtTime(0.55, ctx.currentTime + 1.0);
+  g.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.5);
+  noise.connect(hpf); hpf.connect(g); g.connect(ctx.destination);
+  noise.start();
+  const boom = ctx.createOscillator(), bg = ctx.createGain();
+  boom.type = 'sawtooth';
+  boom.frequency.setValueAtTime(120, ctx.currentTime + 1.1);
+  boom.frequency.exponentialRampToValueAtTime(25, ctx.currentTime + 2.0);
+  bg.gain.setValueAtTime(0.9, ctx.currentTime + 1.1);
+  bg.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2.1);
+  boom.connect(bg); bg.connect(ctx.destination);
+  boom.start(ctx.currentTime + 1.1); boom.stop(ctx.currentTime + 2.1);
+}
+
+// 🧟 ゾンビ: 低音うめき声
+function mcZombie(ctx) {
+  [0, 0.75, 1.45].forEach(t => {
+    const osc = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(110, ctx.currentTime + t);
+    osc.frequency.linearRampToValueAtTime(80, ctx.currentTime + t + 0.55);
+    f.type = 'bandpass'; f.frequency.value = 550; f.Q.value = 5;
+    g.gain.setValueAtTime(0.5, ctx.currentTime + t);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.65);
+    osc.connect(f); f.connect(g); g.connect(ctx.destination);
+    osc.start(ctx.currentTime + t); osc.stop(ctx.currentTime + t + 0.65);
+  });
+}
+
+// 👁 エンダーマン: 不気味な高音スクリーチ
+function mcEnderman(ctx) {
+  [0, 0.45, 0.85, 1.25].forEach((t, i) => {
+    const osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = 'sawtooth';
+    const bf = [950, 1500, 720, 1900][i];
+    osc.frequency.setValueAtTime(bf, ctx.currentTime + t);
+    osc.frequency.exponentialRampToValueAtTime(bf * 1.45, ctx.currentTime + t + 0.38);
+    g.gain.setValueAtTime(0.18, ctx.currentTime + t);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.42);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(ctx.currentTime + t); osc.stop(ctx.currentTime + t + 0.44);
+  });
+}
+
+// 🐷 ブタ: オインク
+function mcPig(ctx) {
+  [0, 0.55, 1.05].forEach(t => {
+    const osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(270, ctx.currentTime + t);
+    osc.frequency.linearRampToValueAtTime(430, ctx.currentTime + t + 0.13);
+    osc.frequency.linearRampToValueAtTime(230, ctx.currentTime + t + 0.33);
+    g.gain.setValueAtTime(0.55, ctx.currentTime + t);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.4);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(ctx.currentTime + t); osc.stop(ctx.currentTime + t + 0.42);
+  });
+}
+
+// 💀 スケルトン: カタカタ骨音
+function mcSkeleton(ctx) {
+  [0, 0.1, 0.22, 0.4, 0.52, 0.66, 0.78, 0.95, 1.07, 1.22].forEach(t => {
+    const slen = Math.floor(ctx.sampleRate * 0.04);
+    const buf = ctx.createBuffer(1, slen, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < slen; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / slen);
+    const src = ctx.createBufferSource(), bpf = ctx.createBiquadFilter(), g = ctx.createGain();
+    bpf.type = 'bandpass'; bpf.frequency.value = 2200 + Math.random() * 2500; bpf.Q.value = 1.8;
+    g.gain.value = 0.65;
+    src.buffer = buf;
+    src.connect(bpf); bpf.connect(g); g.connect(ctx.destination);
+    src.start(ctx.currentTime + t);
+  });
+}
+
+function updateAlarmUI() {
+  alarmToggle.textContent = alarmEnabled ? 'オン' : 'オフ';
+  alarmToggle.classList.toggle('active', alarmEnabled);
+  alarmRow.classList.toggle('active', alarmEnabled);
+  alarmBell.textContent = alarmEnabled ? '🔔' : '🔕';
+
+  if (alarmEnabled && alarmInput.value) {
+    const [h, m] = alarmInput.value.split(':');
+    alarmNext.textContent = `${h}時${m}分 にアラーム`;
+  } else {
+    alarmNext.textContent = '';
+  }
+  // widget bar alarm
+  const wbAlarm = document.getElementById('wbAlarm');
+  if (wbAlarm) wbAlarm.textContent = alarmEnabled && alarmInput.value ? `🔔 ${alarmInput.value}` : '';
+}
+
+alarmToggle.addEventListener('click', async () => {
+  if (!alarmInput.value) { showToast('⏰ 時刻を設定してください'); return; }
+  alarmEnabled = !alarmEnabled;
+  if (alarmEnabled && 'Notification' in window && Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+  alarmFired = false;
+  updateAlarmUI();
+});
+
+alarmInput.addEventListener('change', () => {
+  localStorage.setItem('alarmTime', alarmInput.value);
+  alarmFired = false;
+  if (alarmEnabled) updateAlarmUI();
+});
+
+setInterval(updateClock, 1000);
+updateClock();
+
+// --- ウィジェットモード ---
+(function () {
+  if (new URLSearchParams(location.search).get('mini') === '1') {
+    document.body.classList.add('widget-mode');
+  }
+
+  // widget bar のモードラベルを updateDisplay のたびに更新
+  const origUpdateDisplay = updateDisplay;
+  updateDisplay = function () {
+    origUpdateDisplay();
+    const wbLabel = document.getElementById('wbLabel');
+    if (wbLabel) wbLabel.textContent = `${MODES[currentMode].label} ${fmtDisplay(remaining)}`;
+  };
+
+  document.getElementById('miniBtn').addEventListener('click', () => {
+    const u = location.origin + location.pathname + '?mini=1';
+    window.open(u, 'mizuking-widget',
+      'width=310,height=410,resizable=yes,scrollbars=no,menubar=no,toolbar=no,location=no');
+  });
+})();
+
+// --- Service Worker (PWA) ---
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// init
+setAccent('work');
+updateTabLabels();
+updateDisplay();
+updateRing(1);
+refreshTomatoDisplay();
+</script>
+
+<script>
+/* ── Minecraft background ── */
+(function () {
+  // Apple Watch など極小画面では描画スキップ
+  if (window.innerWidth <= 200) return;
+  const canvas = document.getElementById('bgCanvas');
+  const ctx    = canvas.getContext('2d');
+  const BS     = 32; // block size px
+
+  const C = {
+    skyTop:   '#5BA8D4', skyBot: '#A8D4EF',
+    grassTop: '#79C05A', grassSide: '#5A8A38',
+    dirt: '#8B5E3C', dirtShade: '#6E4A2E',
+    stone: '#7F7F7F', stoneDark: '#5E5E5E', stoneLight: '#9A9A9A',
+    wood:  '#675231', woodDark: '#4E3D22',
+    leaf:  '#4A8C1E', leafDark: '#2F6010', leafLight: '#5EAA28',
+    sun:   '#FFEE33', sunInner: '#FFD700',
+    cloud: '#F2F2F2', cloudShadow: '#CACACA',
+    water: '#3A7DB8', waterLight: '#5599CC',
+    sand:  '#D4C07A',
+  };
+
+  // terrain heights (col → surface row offset from groundBase)
+  const TMAP = [0,0,0,-1,-1,-1,-2,-2,-1,-1,0,0,0,1,1,2,2,1,1,0,
+                0,0,-1,-1,-2,-1,-1,0,0,0,1,1,1,2,2,2,1,0,0,-1,-1,0,0,0];
+
+  // cloud positions [x offset, y row, width in blocks]
+  const CLOUDS = [
+    { x: 1.5, y: 1.2, w: 7 },
+    { x: 14,  y: 0.7, w: 5 },
+    { x: 27,  y: 1.5, w: 6 },
+    { x: 42,  y: 0.9, w: 4 },
+  ];
+  let cloudShift = 0;
+
+  function block(x, y, top, mid, shade) {
+    ctx.fillStyle = mid;
+    ctx.fillRect(x, y, BS, BS);
+    ctx.fillStyle = top;
+    ctx.fillRect(x, y, BS, 8);
+    ctx.fillStyle = shade;
+    ctx.fillRect(x, y, 5, BS);
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + .5, y + .5, BS - 1, BS - 1);
+  }
+
+  function grassBlock(x, y) { block(x, y, C.grassTop, C.dirt,      C.grassSide); }
+  function dirtBlock (x, y) { block(x, y, C.dirtShade, C.dirt,     C.dirtShade); }
+  function stoneBlock(x, y) {
+    block(x, y, C.stoneLight, C.stone, C.stoneDark);
+    // random crack detail (deterministic by position)
+    const r = ((x * 31 + y * 17) % 7);
+    if (r < 2) {
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x + 8 + r * 4, y + 6);
+      ctx.lineTo(x + 14 + r * 3, y + 16);
+      ctx.stroke();
+    }
+  }
+  function sandBlock(x, y) { block(x, y, C.sand, C.sand, '#B8A45A'); }
+  function waterBlock(x, y) {
+    ctx.fillStyle = C.water;
+    ctx.fillRect(x, y, BS, BS);
+    ctx.fillStyle = C.waterLight;
+    ctx.fillRect(x + 3, y + 4, BS - 6, 4);
+    ctx.fillRect(x + 5, y + 14, BS - 10, 3);
+  }
+
+  function drawTree(bx, surfaceY) {
+    const trunkH = 5;
+    for (let i = 1; i <= trunkH; i++) {
+      const ty = surfaceY - i * BS;
+      block(bx, ty, C.woodDark, C.wood, C.woodDark);
+    }
+    const leafTop = surfaceY - (trunkH + 1) * BS;
+    const leafMap = [
+      [0,1,1,1,0],
+      [1,1,1,1,1],
+      [1,1,1,1,1],
+      [0,1,1,1,0],
+    ];
+    leafMap.forEach((row, ry) => {
+      row.forEach((cell, rx) => {
+        if (!cell) return;
+        const lx = bx + (rx - 2) * BS;
+        const ly = leafTop - (3 - ry) * BS;
+        block(lx, ly, C.leafLight, C.leaf, C.leafDark);
+      });
+    });
+  }
+
+  function drawSun(W) {
+    const sx = W - 5 * BS, sy = BS;
+    const s  = BS * 2;
+    ctx.fillStyle = C.sun;
+    ctx.fillRect(sx, sy, s, s);
+    ctx.fillStyle = C.sunInner;
+    ctx.fillRect(sx + 8, sy + 8, s - 16, s - 16);
+    ctx.strokeStyle = '#C8A800';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(sx + 1, sy + 1, s - 2, s - 2);
+  }
+
+  function drawCloud(bx, by, w) {
+    const shape = [
+      { dx: 1, dy: 0, bw: w - 2, bh: 1 },
+      { dx: 0, dy: 1, bw: w,     bh: 1 },
+      { dx: 1, dy: 2, bw: w - 2, bh: 1 },
+    ];
+    const ch = Math.round(BS * 0.55);
+    shape.forEach(({ dx, dy, bw, bh }) => {
+      const cx = bx + dx * BS, cy = by + dy * ch;
+      ctx.fillStyle = dy === 2 ? C.cloudShadow : C.cloud;
+      ctx.fillRect(cx, cy, bw * BS, bh * ch);
+      ctx.strokeStyle = 'rgba(160,160,160,0.4)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(cx + .5, cy + .5, bw * BS - 1, bh * ch - 1);
+    });
+  }
+
+  function drawScene() {
+    const W = canvas.width, H = canvas.height;
+
+    // sky gradient
+    const sky = ctx.createLinearGradient(0, 0, 0, H * 0.75);
+    sky.addColorStop(0, C.skyTop);
+    sky.addColorStop(1, C.skyBot);
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    drawSun(W);
+
+    // clouds (animated drift)
+    CLOUDS.forEach(cl => {
+      const x = ((cl.x * BS + cloudShift * cl.w * 0.5) % (W + cl.w * BS + 200)) - cl.w * BS;
+      drawCloud(x, cl.y * BS, cl.w);
+    });
+
+    // terrain
+    const cols      = Math.ceil(W / BS) + 2;
+    const groundBase = Math.floor(H / BS) - 4;
+
+    // lake: cols 18-24
+    const lakeStart = 18, lakeEnd = 24;
+
+    for (let c = 0; c < cols; c++) {
+      const th     = TMAP[c % TMAP.length];
+      const surf   = groundBase + th; // surface row (in block units from top)
+      const surfY  = surf * BS;
+      const inLake = c >= lakeStart && c <= lakeEnd;
+
+      for (let r = surf; r < groundBase + 8; r++) {
+        const y = r * BS;
+        if (inLake && r === surf) {
+          waterBlock(c * BS, y);
+        } else if (inLake && r === surf + 1) {
+          sandBlock(c * BS, y);
+        } else if (r === surf) {
+          grassBlock(c * BS, y);
+        } else if (r < surf + 4) {
+          dirtBlock(c * BS, y);
+        } else {
+          stoneBlock(c * BS, y);
+        }
+      }
+    }
+
+    // trees
+    [3, 10, 32, 38, 47].forEach(tc => {
+      if (tc >= lakeStart - 1 && tc <= lakeEnd + 1) return;
+      const th   = TMAP[tc % TMAP.length];
+      const surf = groundBase + th;
+      drawTree(tc * BS, surf * BS);
+    });
+  }
+
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+    drawScene();
+  }
+
+  // cloud animation at ~20fps
+  let last = 0;
+  function animate(ts) {
+    if (ts - last > 50) {
+      cloudShift += 0.4;
+      drawScene();
+      last = ts;
+    }
+    requestAnimationFrame(animate);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  requestAnimationFrame(animate);
+})();
+</script>
+
+</body>
+</html>
