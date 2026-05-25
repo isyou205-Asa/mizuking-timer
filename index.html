@@ -1486,14 +1486,16 @@ let soundLoopTimer = null;
 function startSoundLoop(msg) {
   stopSoundLoop();
   soundLooping = true;
-  document.getElementById('stopPopupMsg').innerHTML  = msg.replace('\n', '<br>');
+  document.getElementById('stopPopupMsg').innerHTML = msg.replace('\n', '<br>');
   document.getElementById('stopPopupSound').textContent = SOUND_NAME[alarmSound] || '';
   document.getElementById('stopPopup').classList.add('show');
-  (function loop() {
+
+  // ポップアップ表示から2秒後に音を開始してループ
+  soundLoopTimer = setTimeout(function loop() {
     if (!soundLooping) return;
     playMcSound(alarmSound);
     soundLoopTimer = setTimeout(loop, (SOUND_DUR[alarmSound] || 2200) + 350);
-  })();
+  }, 2000);
 }
 
 function stopSoundLoop() {
